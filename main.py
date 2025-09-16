@@ -31,6 +31,8 @@ def get_args():
     parser.add_argument("--prob1", type=float, default=0.6, help="weight")
     parser.add_argument("--prob2", type=float, default=0.3, help="weight")
     parser.add_argument("--prob3", type=float, default=0.3, help="weight")
+    parser.add_argument("--resume", action="store_true", help="resume training from checkpoint")
+    parser.add_argument("--checkpoint", type=str, default="All_best_onoff.ckpt", help="checkpoint file name to resume from")
     return parser.parse_args()
 
 
@@ -170,6 +172,18 @@ if __name__ == '__main__':
 
     optim = optim.Adam(params=[p for p in model.parameters() if p.requires_grad], lr=config.lr)
     net = Basic(model, optim)
+    
+    # Resume from checkpoint if specified
+    if args.resume:
+        checkpoint_path = os.path.join(modelDir, args.checkpoint)
+        if os.path.exists(checkpoint_path):
+            logger.info(f"Resuming training from checkpoint: {checkpoint_path}")
+            checkpoint = torch.load(checkpoint_path, map_location=device)
+            net = utils.loadModel(logger, net, checkpoint)
+        else:
+            logger.error(f"Checkpoint file not found: {checkpoint_path}")
+            logger.info("Starting training from scratch")
+    
     criterion_r = nn.MSELoss()
     criterion_c = nn.BCELoss()
     criterion = [criterion_r, criterion_c]
@@ -182,4 +196,3 @@ if __name__ == '__main__':
     utils.evaluateResult(net_all, config, vali_Dataloader, logger)
     logger.info("test start")
     utils.evaluateResult(net_all, config, test_Dataloader, logger)
-
