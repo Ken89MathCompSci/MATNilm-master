@@ -31,15 +31,16 @@ def get_args():
     parser.add_argument("--prob1", type=float, default=0.6, help="weight")
     parser.add_argument("--prob2", type=float, default=0.3, help="weight")
     parser.add_argument("--prob3", type=float, default=0.3, help="weight")
+    parser.add_argument("--patience", type=int, default=30, help="early stopping patience")
     parser.add_argument("--resume", action="store_true", help="resume training from checkpoint")
     parser.add_argument("--checkpoint", type=str, default="All_best_onoff.ckpt", help="checkpoint file name to resume from")
     return parser.parse_args()
 
 
-def train(t_net, train_Dataloader, vali_Dataloader, config, criterion, modelDir, epo=200):
+def train(t_net, train_Dataloader, vali_Dataloader, config, criterion, modelDir, epo=200, patience=30):
     iter_loss = []
     vali_loss = []
-    early_stopping_all = utils.EarlyStopping(logger, patience=30, verbose=True)
+    early_stopping_all = utils.EarlyStopping(logger, patience=patience, verbose=True)
 
     if config.dataAug:
         sigClass = utils.sigGen(config)
@@ -189,7 +190,7 @@ if __name__ == '__main__':
     criterion = [criterion_r, criterion_c]
 
     logger.info("Training start")
-    net_all = train(net, train_Dataloader, vali_Dataloader, config, criterion, modelDir, epo=epo)
+    net_all = train(net, train_Dataloader, vali_Dataloader, config, criterion, modelDir, epo=epo, patience=args.patience)
     logger.info("Training end")
 
     logger.info("validation start")
