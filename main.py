@@ -10,6 +10,7 @@ from torch import nn, optim
 from torch.utils.data import DataLoader
 from custom_types import Basic, TrainConfig
 from modules import MATconv as MAT
+from loss_func import CombinedClassificationLoss
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 
@@ -90,7 +91,7 @@ def train(t_net, train_Dataloader, vali_Dataloader, config, criterion, modelDir,
             break
 
     net_all = copy.deepcopy(net)
-    checkpoint_all = torch.load(path_all, map_location=device)
+    checkpoint_all = torch.load(path_all, map_location=device, weights_only=False)
     utils.loadModel(logger, net_all, checkpoint_all)
     net_all.model.eval()
     
@@ -179,14 +180,14 @@ if __name__ == '__main__':
         checkpoint_path = os.path.join(modelDir, args.checkpoint)
         if os.path.exists(checkpoint_path):
             logger.info(f"Resuming training from checkpoint: {checkpoint_path}")
-            checkpoint = torch.load(checkpoint_path, map_location=device)
+            checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
             net = utils.loadModel(logger, net, checkpoint)
         else:
             logger.error(f"Checkpoint file not found: {checkpoint_path}")
             logger.info("Starting training from scratch")
     
     criterion_r = nn.MSELoss()
-    criterion_c = nn.BCELoss()
+    criterion_c = CombinedClassificationLoss()
     criterion = [criterion_r, criterion_c]
 
     logger.info("Training start")
