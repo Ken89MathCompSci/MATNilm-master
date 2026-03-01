@@ -148,7 +148,7 @@ if __name__ == '__main__':
     if args.debug:
         epo = 2
     else:
-        epo = 200
+        epo = 80
 
     # splitLoss = False
     # trainFull = True
