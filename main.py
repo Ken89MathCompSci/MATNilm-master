@@ -10,6 +10,7 @@ from torch import nn, optim
 from torch.utils.data import DataLoader
 from custom_types import Basic, TrainConfig
 from modules import MATconv as MAT
+import matplotlib.pyplot as plt
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 
@@ -37,9 +38,47 @@ def get_args():
     return parser.parse_args()
 
 
+def plot_metrics(mae_history, sae_history, f1_history, modelDir):
+    appliances = ['Dishwasher', 'Fridge', 'Microwave', 'Washing Machine']
+    epochs = range(1, len(mae_history) + 1)
+    mae_arr = np.array(mae_history)
+    sae_arr = np.array(sae_history)
+    f1_arr = np.array(f1_history)
+
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+
+    for i, name in enumerate(appliances):
+        axes[0].plot(epochs, mae_arr[:, i], label=name)
+    axes[0].set_title('MAE per Epoch')
+    axes[0].set_xlabel('Epoch')
+    axes[0].set_ylabel('MAE (watts)')
+    axes[0].legend()
+
+    for i, name in enumerate(appliances):
+        axes[1].plot(epochs, sae_arr[:, i], label=name)
+    axes[1].set_title('SAE per Epoch')
+    axes[1].set_xlabel('Epoch')
+    axes[1].set_ylabel('SAE (watts)')
+    axes[1].legend()
+
+    for i, name in enumerate(appliances):
+        axes[2].plot(epochs, f1_arr[:, i], label=name)
+    axes[2].set_title('F1 Score per Epoch')
+    axes[2].set_xlabel('Epoch')
+    axes[2].set_ylabel('F1')
+    axes[2].legend()
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(modelDir, 'metrics.png'), dpi=150)
+    plt.show()
+
+
 def train(t_net, train_Dataloader, vali_Dataloader, config, criterion, modelDir, epo=200, patience=30):
     iter_loss = []
     vali_loss = []
+    mae_history = []
+    sae_history = []
+    f1_history = []
     early_stopping_all = utils.EarlyStopping(logger, patience=patience, verbose=True)
 
     if config.dataAug:
@@ -74,10 +113,13 @@ def train(t_net, train_Dataloader, vali_Dataloader, config, criterion, modelDir,
         epoch_losses = np.average(iter_loss)
 
         logger.info(f"Validation: ")
-        maeScore, y_vali_ori, y_vali_pred_d_update, _, _, _ = utils.evaluateResult(net, config, vali_Dataloader, logger)
+        maeScore, saeScore, f1Score, y_vali_ori, y_vali_pred_d_update, _, _, _ = utils.evaluateResult(net, config, vali_Dataloader, logger)
         val_loss = criterion[0](y_vali_ori, y_vali_pred_d_update)
         logger.info(f"Epoch {e_i:d}, train loss: {epoch_losses:3.3f}, val loss: {val_loss:3.3f}.")
         vali_loss.append(val_loss)
+        mae_history.append(maeScore)
+        sae_history.append(saeScore)
+        f1_history.append(f1Score)
 
         if e_i % 10 == 0:
             checkpointName = os.path.join(modelDir, "checkpoint_" + str(e_i) + '.ckpt')
@@ -93,8 +135,8 @@ def train(t_net, train_Dataloader, vali_Dataloader, config, criterion, modelDir,
     checkpoint_all = torch.load(path_all, map_location=device)
     utils.loadModel(logger, net_all, checkpoint_all)
     net_all.model.eval()
-    
-    return net_all
+
+    return net_all, mae_history, sae_history, f1_history
 
 if __name__ == '__main__':
     args = get_args()
@@ -190,8 +232,10 @@ if __name__ == '__main__':
     criterion = [criterion_r, criterion_c]
 
     logger.info("Training start")
-    net_all = train(net, train_Dataloader, vali_Dataloader, config, criterion, modelDir, epo=epo, patience=args.patience)
+    net_all, mae_history, sae_history, f1_history = train(net, train_Dataloader, vali_Dataloader, config, criterion, modelDir, epo=epo, patience=args.patience)
     logger.info("Training end")
+
+    plot_metrics(mae_history, sae_history, f1_history, modelDir)
 
     logger.info("validation start")
     utils.evaluateResult(net_all, config, vali_Dataloader, logger)

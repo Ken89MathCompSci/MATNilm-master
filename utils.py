@@ -87,15 +87,20 @@ def evaluate_score(y_real, y_predict, y_real_c, y_pred_c, logger):
     f1s = f1_score(y_real_c, np.round(y_pred_c))
     logger.info(f"F1: {f1s}")
 
-    return maeScore
+    return maeScore, SAE, f1s
 
 def evaluate_score_multi(y_real, y_predict, y_real_c, y_pred_c, logger):
     listOfAppliance = ['dish washer', 'fridge', 'microwave', 'wash']
     mapeScore = []
+    saeScore = []
+    f1Score = []
     for i in range(y_predict.shape[1]):
         logger.info(f"Evaluate {listOfAppliance[i]}: ")
-        mapeScore.append(evaluate_score(y_real[:,i], y_predict[:,i], y_real_c[:,i], y_pred_c[:,i], logger))
-    return mapeScore
+        mae_i, sae_i, f1_i = evaluate_score(y_real[:,i], y_predict[:,i], y_real_c[:,i], y_pred_c[:,i], logger)
+        mapeScore.append(mae_i)
+        saeScore.append(sae_i)
+        f1Score.append(f1_i)
+    return mapeScore, saeScore, f1Score
     
 
 
@@ -418,11 +423,11 @@ def evaluateResult(net, config, vali_Dataloader, logger, mode=-1):
     y_vali_pred_d_update = y_vali_pred_d
 
     if mode>=0:
-        maeScore = evaluate_score(y_vali_ori.numpy(), y_vali_pred_d_update.numpy(), y_vali_ori_c.numpy(), y_vali_pred_c.numpy(), logger)
+        maeScore, saeScore, f1Score = evaluate_score(y_vali_ori.numpy(), y_vali_pred_d_update.numpy(), y_vali_ori_c.numpy(), y_vali_pred_c.numpy(), logger)
     else:
-        maeScore = evaluate_score_multi(y_vali_ori.numpy(), y_vali_pred_d_update.numpy(), y_vali_ori_c.numpy(), y_vali_pred_c.numpy(), logger)
+        maeScore, saeScore, f1Score = evaluate_score_multi(y_vali_ori.numpy(), y_vali_pred_d_update.numpy(), y_vali_ori_c.numpy(), y_vali_pred_c.numpy(), logger)
 
-    return maeScore, y_vali_ori, y_vali_pred_d_update, y_vali_ori_c, y_vali_pred_c, truex.reshape(-1, 1)
+    return maeScore, saeScore, f1Score, y_vali_ori, y_vali_pred_d_update, y_vali_ori_c, y_vali_pred_c, truex.reshape(-1, 1)
 
 def predict(t_net, t_cfg, vali_Dataloader, mode=-1):
     '''
