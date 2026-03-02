@@ -177,16 +177,9 @@ class MATconv(nn.Module):
                                    nn.Linear(config.hidden, 1))
 
         lnn_hidden = 2 * config.hidden
-        # LNN temporal refinement — regression branch (one CfC per appliance)
-        self.lnn_dr = CfC(lnn_hidden, lnn_hidden)
-        self.lnn_fr = CfC(lnn_hidden, lnn_hidden)
-        self.lnn_mr = CfC(lnn_hidden, lnn_hidden)
-        self.lnn_wr = CfC(lnn_hidden, lnn_hidden)
-        # LNN temporal refinement — classification branch (one CfC per appliance)
-        self.lnn_dc = CfC(lnn_hidden, lnn_hidden)
-        self.lnn_fc = CfC(lnn_hidden, lnn_hidden)
-        self.lnn_mc = CfC(lnn_hidden, lnn_hidden)
-        self.lnn_wc = CfC(lnn_hidden, lnn_hidden)
+        # Shared CfC cells — all 4 appliances batched together per branch
+        self.lnn_r = CfC(lnn_hidden, lnn_hidden, mode="no_gate")
+        self.lnn_c = CfC(lnn_hidden, lnn_hidden, mode="no_gate")
 
     def forward(self, input_data):
 
@@ -208,16 +201,11 @@ class MATconv(nn.Module):
         d_r, f_r, m_r, w_r = self.block2(d_r, f_r, m_r, w_r)
         d_rr, f_rr, m_rr, w_rr, d_cc, f_cc, m_cc, w_cc = self.block3(d_r, f_r, m_r, w_r)
 
-        # LNN temporal refinement — regression branch
-        d_rr, _ = self.lnn_dr(d_rr)
-        f_rr, _ = self.lnn_fr(f_rr)
-        m_rr, _ = self.lnn_mr(m_rr)
-        w_rr, _ = self.lnn_wr(w_rr)
-        # LNN temporal refinement — classification branch
-        d_cc, _ = self.lnn_dc(d_cc)
-        f_cc, _ = self.lnn_fc(f_cc)
-        m_cc, _ = self.lnn_mc(m_cc)
-        w_cc, _ = self.lnn_wc(w_cc)
+        # LNN temporal refinement — stack all appliances on batch dim, run one CfC each branch
+        r_out, _ = self.lnn_r(torch.cat([d_rr, f_rr, m_rr, w_rr], dim=0))
+        d_rr, f_rr, m_rr, w_rr = r_out.chunk(4, dim=0)
+        c_out, _ = self.lnn_c(torch.cat([d_cc, f_cc, m_cc, w_cc], dim=0))
+        d_cc, f_cc, m_cc, w_cc = c_out.chunk(4, dim=0)
 
         dc = torch.sigmoid(self.fc_dc(d_cc))
         fc = torch.sigmoid(self.fc_fc(f_cc))
