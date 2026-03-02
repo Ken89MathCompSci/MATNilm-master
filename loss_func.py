@@ -23,8 +23,9 @@ class BinaryKLLoss(nn.Module):
 
     def forward(self, y_pred, y_true):
         # y_pred is sigmoid output (prob for class 1), y_true is 0 or 1
-        pred_dist = torch.stack([torch.clamp(1 - y_pred, min=1e-8), torch.clamp(y_pred, min=1e-8)], dim=-1)
-        true_dist = torch.stack([torch.clamp(1 - y_true, min=1e-8), torch.clamp(y_true, min=1e-8)], dim=-1)
+        pred_dist = torch.stack([torch.clamp(1 - y_pred, min=1e-8, max=1-1e-8), torch.clamp(y_pred, min=1e-8, max=1-1e-8)], dim=-1)
+        true_dist = torch.stack([torch.clamp(1 - y_true, min=1e-8, max=1-1e-8), torch.clamp(y_true, min=1e-8, max=1-1e-8)], dim=-1)
+        true_dist = true_dist / true_dist.sum(dim=-1, keepdim=True)
         return F.kl_div(pred_dist.log(), true_dist, reduction='batchmean')
 
 class FocalLoss(nn.Module):
