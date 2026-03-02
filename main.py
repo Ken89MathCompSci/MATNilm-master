@@ -173,7 +173,7 @@ if __name__ == '__main__':
     model = MAT(config).to(device)
     logger.info("Model MAT")
 
-    optim = optim.Adam(params=[p for p in model.parameters() if p.requires_grad], lr=config.lr)
+    optim = optim.AdamW(params=[p for p in model.parameters() if p.requires_grad], lr=config.lr, weight_decay=1e-4)
     net = Basic(model, optim)
     
     # Resume from checkpoint if specified
