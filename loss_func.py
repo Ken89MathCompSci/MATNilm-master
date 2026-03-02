@@ -27,14 +27,24 @@ class BinaryKLLoss(nn.Module):
         true_dist = torch.stack([torch.clamp(1 - y_true, min=1e-8), torch.clamp(y_true, min=1e-8)], dim=-1)
         return F.kl_div(pred_dist.log(), true_dist, reduction='batchmean')
 
+class FocalLoss(nn.Module):
+    def __init__(self, gamma=2.0):
+        super(FocalLoss, self).__init__()
+        self.gamma = gamma
+
+    def forward(self, y_pred, y_true):
+        bce = F.binary_cross_entropy(y_pred, y_true, reduction='none')
+        pt = torch.where(y_true == 1, y_pred, 1 - y_pred)
+        return (((1 - pt) ** self.gamma) * bce).mean()
+
 class CombinedClassificationLoss(nn.Module):
     def __init__(self):
         super(CombinedClassificationLoss, self).__init__()
-        self.bce = nn.BCELoss()
+        self.focal = FocalLoss(gamma=2.0)
         self.kl = BinaryKLLoss()
 
     def forward(self, y_pred, y_true):
-        return self.bce(y_pred, y_true) + self.kl(y_pred, y_true)
+        return self.focal(y_pred, y_true) + self.kl(y_pred, y_true)
 
 def binary_kl_loss(y_pred, y_true):
     # y_pred is sigmoid output (prob for class 1), y_true is 0 or 1
