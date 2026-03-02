@@ -5,6 +5,7 @@ from torch import nn
 from torch.autograd import Variable
 from torch.nn import functional as tf
 import numpy as np
+from ncps.torch import CfC
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -175,6 +176,18 @@ class MATconv(nn.Module):
                                    nn.ReLU(),
                                    nn.Linear(config.hidden, 1))
 
+        lnn_hidden = 2 * config.hidden
+        # LNN temporal refinement — regression branch (one CfC per appliance)
+        self.lnn_dr = CfC(lnn_hidden, lnn_hidden)
+        self.lnn_fr = CfC(lnn_hidden, lnn_hidden)
+        self.lnn_mr = CfC(lnn_hidden, lnn_hidden)
+        self.lnn_wr = CfC(lnn_hidden, lnn_hidden)
+        # LNN temporal refinement — classification branch (one CfC per appliance)
+        self.lnn_dc = CfC(lnn_hidden, lnn_hidden)
+        self.lnn_fc = CfC(lnn_hidden, lnn_hidden)
+        self.lnn_mc = CfC(lnn_hidden, lnn_hidden)
+        self.lnn_wc = CfC(lnn_hidden, lnn_hidden)
+
     def forward(self, input_data):
 
         # feature weighting
@@ -194,6 +207,17 @@ class MATconv(nn.Module):
         d_r, f_r, m_r, w_r = self.block1(input_encoded, input_encoded, input_encoded, input_encoded)
         d_r, f_r, m_r, w_r = self.block2(d_r, f_r, m_r, w_r)
         d_rr, f_rr, m_rr, w_rr, d_cc, f_cc, m_cc, w_cc = self.block3(d_r, f_r, m_r, w_r)
+
+        # LNN temporal refinement — regression branch
+        d_rr, _ = self.lnn_dr(d_rr)
+        f_rr, _ = self.lnn_fr(f_rr)
+        m_rr, _ = self.lnn_mr(m_rr)
+        w_rr, _ = self.lnn_wr(w_rr)
+        # LNN temporal refinement — classification branch
+        d_cc, _ = self.lnn_dc(d_cc)
+        f_cc, _ = self.lnn_fc(f_cc)
+        m_cc, _ = self.lnn_mc(m_cc)
+        w_cc, _ = self.lnn_wc(w_cc)
 
         dc = torch.sigmoid(self.fc_dc(d_cc))
         fc = torch.sigmoid(self.fc_fc(f_cc))

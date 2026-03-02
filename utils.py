@@ -87,15 +87,18 @@ def evaluate_score(y_real, y_predict, y_real_c, y_pred_c, logger):
     f1s = f1_score(y_real_c, np.round(y_pred_c))
     logger.info(f"F1: {f1s}")
 
-    return maeScore
+    return maeScore, SAE, f1s
 
 def evaluate_score_multi(y_real, y_predict, y_real_c, y_pred_c, logger):
     listOfAppliance = ['dish washer', 'fridge', 'microwave', 'wash']
-    mapeScore = []
+    maeScores, saeScores, f1Scores = [], [], []
     for i in range(y_predict.shape[1]):
         logger.info(f"Evaluate {listOfAppliance[i]}: ")
-        mapeScore.append(evaluate_score(y_real[:,i], y_predict[:,i], y_real_c[:,i], y_pred_c[:,i], logger))
-    return mapeScore
+        mae, sae_val, f1 = evaluate_score(y_real[:,i], y_predict[:,i], y_real_c[:,i], y_pred_c[:,i], logger)
+        maeScores.append(mae)
+        saeScores.append(sae_val)
+        f1Scores.append(f1)
+    return maeScores, saeScores, f1Scores
     
 
 
