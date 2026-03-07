@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from custom_types import Basic, TrainConfig
 from modules import MATconv as MAT
 import matplotlib.pyplot as plt
-os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+os.environ['CUDA_LAUNCH_BLOCKING'] = "0"
 
 
 def get_args():
