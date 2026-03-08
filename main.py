@@ -10,7 +10,7 @@ from torch import nn, optim
 from torch.utils.data import DataLoader
 from custom_types import Basic, TrainConfig
 from modules import MATconv as MAT
-from loss_func import CombinedClassificationLoss
+from loss_func import CombinedClassificationLoss, PhysicsLoss
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 
@@ -34,13 +34,14 @@ def get_args():
     parser.add_argument("--prob3", type=float, default=0.3, help="weight")
     parser.add_argument("--epochs", type=int, default=200, help="number of training epochs")
     parser.add_argument("--patience", type=int, default=30, help="early stopping patience")
+    parser.add_argument("--physics_weight", type=float, default=1.0, help="weight for physics (energy conservation) loss, 0 to disable")
     parser.add_argument("--no_early_stopping", action="store_true", help="disable early stopping and train for all epochs")
     parser.add_argument("--resume", action="store_true", help="resume training from checkpoint")
     parser.add_argument("--checkpoint", type=str, default="All_best_onoff.ckpt", help="checkpoint file name to resume from")
     return parser.parse_args()
 
 
-def train(t_net, train_Dataloader, vali_Dataloader, config, criterion, modelDir, epo=200, patience=30, no_early_stopping=False):
+def train(t_net, train_Dataloader, vali_Dataloader, config, criterion, modelDir, epo=200, patience=30, no_early_stopping=False, physics_weight=1.0):
     iter_loss = []
     vali_loss = []
     early_stopping_all = utils.EarlyStopping(logger, patience=patience, verbose=True)
@@ -67,8 +68,9 @@ def train(t_net, train_Dataloader, vali_Dataloader, config, criterion, modelDir,
 
             loss_r = criterion[0](y_pred_dish_r,Y_scaled)
             loss_c = criterion[1](y_pred_dish_c, Y_of)
+            loss_p = criterion[2](y_pred_dish_r, X_scaled)
 
-            loss=loss_r+loss_c
+            loss = loss_r + loss_c + physics_weight * loss_p
             loss.backward()
 
             t_net.model_opt.step()
@@ -191,10 +193,11 @@ if __name__ == '__main__':
     
     criterion_r = nn.MSELoss()
     criterion_c = CombinedClassificationLoss()
-    criterion = [criterion_r, criterion_c]
+    criterion_p = PhysicsLoss()
+    criterion = [criterion_r, criterion_c, criterion_p]
 
     logger.info("Training start")
-    net_all = train(net, train_Dataloader, vali_Dataloader, config, criterion, modelDir, epo=epo, patience=args.patience, no_early_stopping=args.no_early_stopping)
+    net_all = train(net, train_Dataloader, vali_Dataloader, config, criterion, modelDir, epo=epo, patience=args.patience, no_early_stopping=args.no_early_stopping, physics_weight=args.physics_weight)
     logger.info("Training end")
 
     logger.info("validation start")

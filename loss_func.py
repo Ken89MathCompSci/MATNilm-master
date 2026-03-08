@@ -42,6 +42,25 @@ def binary_kl_loss(y_pred, y_true):
     true_dist = torch.stack([1 - y_true, y_true], dim=-1)
     return F.kl_div(pred_dist.log(), true_dist, reduction='batchmean')
 
+class PhysicsLoss(nn.Module):
+    """
+    Energy conservation loss: penalizes model when the sum of predicted
+    appliance powers exceeds the aggregate mains power (physically impossible).
+    Uses a one-sided squared penalty: loss = mean(max(0, sum_pred - aggregate)^2).
+    Under-prediction is allowed since unmonitored loads account for the gap.
+    Both y_pred_r and x_aggregate should be on the same normalized scale (/612).
+    """
+    def __init__(self):
+        super(PhysicsLoss, self).__init__()
+
+    def forward(self, y_pred_r, x_aggregate):
+        # y_pred_r:    (B, T, 4) — predicted appliance powers (normalized)
+        # x_aggregate: (B, T, 1) — aggregate mains power (normalized)
+        pred_sum = y_pred_r.sum(dim=-1, keepdim=True)  # (B, T, 1)
+        excess = torch.clamp(pred_sum - x_aggregate, min=0)
+        return torch.mean(excess ** 2)
+
+
 class BERT4NILMLoss(nn.Module):
     def __init__(self, tau=0.1, lambda_=1.0):
         super(BERT4NILMLoss, self).__init__()
