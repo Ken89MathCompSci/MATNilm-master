@@ -95,6 +95,9 @@ def train(t_net, train_Dataloader, vali_Dataloader, config, criterion, modelDir,
                 print("Early stopping")
                 break
 
+    if no_early_stopping:
+        utils.saveModel(logger, net, path_all)
+
     net_all = copy.deepcopy(net)
     checkpoint_all = torch.load(path_all, map_location=device, weights_only=False)
     utils.loadModel(logger, net_all, checkpoint_all)
