@@ -74,7 +74,7 @@ def plot_metrics(mae_history, sae_history, f1_history, modelDir):
     plt.show()
 
 
-def train(t_net, train_Dataloader, vali_Dataloader, config, criterion, modelDir, epo=200, patience=30, no_early_stopping=False):
+def train(t_net, train_Dataloader, vali_Dataloader, config, criterion, modelDir, log_sigma=None, epo=200, patience=30, no_early_stopping=False):
     iter_loss = []
     vali_loss = []
     mae_history = []
@@ -105,7 +105,13 @@ def train(t_net, train_Dataloader, vali_Dataloader, config, criterion, modelDir,
             loss_r = criterion[0](y_pred_dish_r,Y_scaled)
             loss_c = criterion[1](y_pred_dish_c, Y_of)
 
-            loss=loss_r+loss_c
+            if log_sigma is not None:
+                # Uncertainty weighting: L = (1/2σ²)*L_task + log(σ)
+                # Parameterized as log_sigma to keep σ > 0
+                loss = (0.5 * torch.exp(-2 * log_sigma[0]) * loss_r + log_sigma[0] +
+                        0.5 * torch.exp(-2 * log_sigma[1]) * loss_c + log_sigma[1])
+            else:
+                loss = loss_r + loss_c
             loss.backward()
 
             t_net.model_opt.step()
@@ -116,7 +122,12 @@ def train(t_net, train_Dataloader, vali_Dataloader, config, criterion, modelDir,
         logger.info(f"Validation: ")
         maeScore, saeScore, f1Score, y_vali_ori, y_vali_pred_d_update, _, _, _ = utils.evaluateResult(net, config, vali_Dataloader, logger)
         val_loss = criterion[0](y_vali_ori, y_vali_pred_d_update)
-        logger.info(f"Epoch {e_i:d}, train loss: {epoch_losses:3.3f}, val loss: {val_loss:3.3f}.")
+        if log_sigma is not None:
+            sigma_r = torch.exp(log_sigma[0]).item()
+            sigma_c = torch.exp(log_sigma[1]).item()
+            logger.info(f"Epoch {e_i:d}, train loss: {epoch_losses:3.3f}, val loss: {val_loss:3.3f}, σ_reg={sigma_r:.4f}, σ_cls={sigma_c:.4f}.")
+        else:
+            logger.info(f"Epoch {e_i:d}, train loss: {epoch_losses:3.3f}, val loss: {val_loss:3.3f}.")
         vali_loss.append(val_loss)
         mae_history.append(maeScore)
         sae_history.append(saeScore)
@@ -218,7 +229,14 @@ if __name__ == '__main__':
     model = MAT(config).to(device)
     logger.info("Model MAT")
 
-    optim = optim.Adam(params=[p for p in model.parameters() if p.requires_grad], lr=config.lr)
+    # Learnable log-sigma parameters for uncertainty weighting (Kendall et al. 2018)
+    # log_sigma[0] -> regression task, log_sigma[1] -> classification task
+    log_sigma = nn.Parameter(torch.zeros(2, device=device))
+
+    optim = optim.Adam(
+        params=[p for p in model.parameters() if p.requires_grad] + [log_sigma],
+        lr=config.lr
+    )
     net = Basic(model, optim)
     
     # Resume from checkpoint if specified
@@ -237,7 +255,7 @@ if __name__ == '__main__':
     criterion = [criterion_r, criterion_c]
 
     logger.info("Training start")
-    net_all, mae_history, sae_history, f1_history = train(net, train_Dataloader, vali_Dataloader, config, criterion, modelDir, epo=epo, patience=args.patience, no_early_stopping=args.no_early_stopping)
+    net_all, mae_history, sae_history, f1_history = train(net, train_Dataloader, vali_Dataloader, config, criterion, modelDir, log_sigma=log_sigma, epo=epo, patience=args.patience, no_early_stopping=args.no_early_stopping)
     logger.info("Training end")
 
     plot_metrics(mae_history, sae_history, f1_history, modelDir)
