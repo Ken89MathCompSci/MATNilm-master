@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from custom_types import Basic, TrainConfig
 from modules import MATconv as MAT
 import matplotlib.pyplot as plt
-os.environ['CUDA_LAUNCH_BLOCKING'] = "0"
+os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 
 def get_args():
@@ -32,9 +32,7 @@ def get_args():
     parser.add_argument("--prob1", type=float, default=0.6, help="weight")
     parser.add_argument("--prob2", type=float, default=0.3, help="weight")
     parser.add_argument("--prob3", type=float, default=0.3, help="weight")
-    parser.add_argument("--epochs", type=int, default=80, help="number of training epochs")
     parser.add_argument("--patience", type=int, default=30, help="early stopping patience")
-    parser.add_argument("--no_early_stopping", action="store_true", help="disable early stopping and train for all epochs")
     parser.add_argument("--resume", action="store_true", help="resume training from checkpoint")
     parser.add_argument("--checkpoint", type=str, default="All_best_onoff.ckpt", help="checkpoint file name to resume from")
     return parser.parse_args()
@@ -75,7 +73,7 @@ def plot_metrics(mae_history, sae_history, f1_history, modelDir):
     plt.show()
 
 
-def train(t_net, train_Dataloader, vali_Dataloader, config, criterion, modelDir, epo=200, patience=30, no_early_stopping=False):
+def train(t_net, train_Dataloader, vali_Dataloader, config, criterion, modelDir, epo=200, patience=30):
     iter_loss = []
     vali_loss = []
     mae_history = []
@@ -127,15 +125,11 @@ def train(t_net, train_Dataloader, vali_Dataloader, config, criterion, modelDir,
             checkpointName = os.path.join(modelDir, "checkpoint_" + str(e_i) + '.ckpt')
             utils.saveModel(logger, net, checkpointName)
 
-        if not no_early_stopping:
-            logger.info(f"Early stopping overall: ")
-            early_stopping_all(np.mean(maeScore), net, path_all)
-            if early_stopping_all.early_stop:
-                print("Early stopping")
-                break
-
-    if no_early_stopping:
-        utils.saveModel(logger, net, path_all)
+        logger.info(f"Early stopping overall: ")
+        early_stopping_all(np.mean(maeScore), net, path_all)
+        if early_stopping_all.early_stop:
+            print("Early stopping")
+            break
 
     net_all = copy.deepcopy(net)
     checkpoint_all = torch.load(path_all, map_location=device)
@@ -154,7 +148,7 @@ if __name__ == '__main__':
     if args.debug:
         epo = 2
     else:
-        epo = args.epochs
+        epo = 80
 
     # splitLoss = False
     # trainFull = True
@@ -238,7 +232,7 @@ if __name__ == '__main__':
     criterion = [criterion_r, criterion_c]
 
     logger.info("Training start")
-    net_all, mae_history, sae_history, f1_history = train(net, train_Dataloader, vali_Dataloader, config, criterion, modelDir, epo=epo, patience=args.patience, no_early_stopping=args.no_early_stopping)
+    net_all, mae_history, sae_history, f1_history = train(net, train_Dataloader, vali_Dataloader, config, criterion, modelDir, epo=epo, patience=args.patience)
     logger.info("Training end")
 
     plot_metrics(mae_history, sae_history, f1_history, modelDir)
