@@ -33,6 +33,7 @@ def get_args():
     parser.add_argument("--prob2", type=float, default=0.3, help="weight")
     parser.add_argument("--prob3", type=float, default=0.3, help="weight")
     parser.add_argument("--patience", type=int, default=30, help="early stopping patience")
+    parser.add_argument("--no_early_stopping", action="store_true", help="disable early stopping and train for all epochs")
     parser.add_argument("--resume", action="store_true", help="resume training from checkpoint")
     parser.add_argument("--checkpoint", type=str, default="All_best_onoff.ckpt", help="checkpoint file name to resume from")
     return parser.parse_args()
@@ -45,7 +46,7 @@ def plot_metrics(mae_history, sae_history, f1_history, modelDir):
     sae_arr = np.array(sae_history)
     f1_arr = np.array(f1_history)
 
-    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+    _, axes = plt.subplots(1, 3, figsize=(18, 5))
 
     for i, name in enumerate(appliances):
         axes[0].plot(epochs, mae_arr[:, i], label=name)
@@ -73,7 +74,7 @@ def plot_metrics(mae_history, sae_history, f1_history, modelDir):
     plt.show()
 
 
-def train(t_net, train_Dataloader, vali_Dataloader, config, criterion, modelDir, epo=200, patience=30):
+def train(t_net, train_Dataloader, vali_Dataloader, config, criterion, modelDir, epo=200, patience=30, no_early_stopping=False):
     iter_loss = []
     vali_loss = []
     mae_history = []
@@ -89,7 +90,7 @@ def train(t_net, train_Dataloader, vali_Dataloader, config, criterion, modelDir,
     for e_i in range(epo):
 
         logger.info(f"# of epoches: {e_i}")
-        for t_i, (_, _, X_scaled, Y_scaled, Y_of) in enumerate(tqdm(train_Dataloader)):
+        for _, (_, _, X_scaled, Y_scaled, Y_of) in enumerate(tqdm(train_Dataloader)):
             if config.dataAug:
                 X_scaled, Y_scaled, Y_of = utils.dataAug(X_scaled.clone(), Y_scaled.clone(), Y_of.clone(), sigClass, config)
 
@@ -125,11 +126,15 @@ def train(t_net, train_Dataloader, vali_Dataloader, config, criterion, modelDir,
             checkpointName = os.path.join(modelDir, "checkpoint_" + str(e_i) + '.ckpt')
             utils.saveModel(logger, net, checkpointName)
 
-        logger.info(f"Early stopping overall: ")
-        early_stopping_all(np.mean(maeScore), net, path_all)
-        if early_stopping_all.early_stop:
-            print("Early stopping")
-            break
+        if not no_early_stopping:
+            logger.info(f"Early stopping overall: ")
+            early_stopping_all(np.mean(maeScore), net, path_all)
+            if early_stopping_all.early_stop:
+                print("Early stopping")
+                break
+
+    if no_early_stopping:
+        utils.saveModel(logger, net, path_all)
 
     net_all = copy.deepcopy(net)
     checkpoint_all = torch.load(path_all, map_location=device)
@@ -232,7 +237,7 @@ if __name__ == '__main__':
     criterion = [criterion_r, criterion_c]
 
     logger.info("Training start")
-    net_all, mae_history, sae_history, f1_history = train(net, train_Dataloader, vali_Dataloader, config, criterion, modelDir, epo=epo, patience=args.patience)
+    net_all, mae_history, sae_history, f1_history = train(net, train_Dataloader, vali_Dataloader, config, criterion, modelDir, epo=epo, patience=args.patience, no_early_stopping=args.no_early_stopping)
     logger.info("Training end")
 
     plot_metrics(mae_history, sae_history, f1_history, modelDir)
