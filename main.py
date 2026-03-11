@@ -32,6 +32,7 @@ def get_args():
     parser.add_argument("--prob1", type=float, default=0.6, help="weight")
     parser.add_argument("--prob2", type=float, default=0.3, help="weight")
     parser.add_argument("--prob3", type=float, default=0.3, help="weight")
+    parser.add_argument("--epochs", type=int, default=80, help="number of training epochs")
     parser.add_argument("--patience", type=int, default=30, help="early stopping patience")
     parser.add_argument("--no_early_stopping", action="store_true", help="disable early stopping and train for all epochs")
     parser.add_argument("--resume", action="store_true", help="resume training from checkpoint")
@@ -153,7 +154,7 @@ if __name__ == '__main__':
     if args.debug:
         epo = 2
     else:
-        epo = 80
+        epo = args.epochs
 
     # splitLoss = False
     # trainFull = True
