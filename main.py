@@ -109,6 +109,7 @@ def train(t_net, train_Dataloader, vali_Dataloader, config, criterion, modelDir,
             loss=loss_r+loss_c
             loss.backward()
 
+            torch.nn.utils.clip_grad_norm_(t_net.model.parameters(), max_norm=1.0)
             t_net.model_opt.step()
             iter_loss.append(loss.item())
 
